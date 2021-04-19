@@ -1,6 +1,8 @@
 {
   "name": "ngx-html2pdf",
-  "version": "0.0.4",
+  "version": "0.0.5",
+  "author": "lfli",
+  "license": "MIT",
   "peerDependencies": {
     "@angular/common": "^11.0.1",
     "@angular/core": "^11.0.1",
