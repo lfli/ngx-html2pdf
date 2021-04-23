@@ -13,6 +13,8 @@ interface IncompletePage {
 })
 export class NgxHtml2pdfService {
 
+  private singleMaxHeight = 15000;
+
   html2pdf(id: string, name: string) {
     return new Promise<void>((resolve, reject) => {
       const tempDiv = document.createElement('div');
@@ -34,12 +36,12 @@ export class NgxHtml2pdfService {
 
         const ele: any = indexTemp.firstChild;
 
-        if (ele.clientHeight > 15000) {
+        if (ele.clientHeight > this.singleMaxHeight) {
 
           this.bigPdfDown(ele, name, tempDiv).then(_ => {
             resolve();
-          }).catch(_ => {
-            reject();
+          }).catch(error => {
+            reject(error);
           })
 
         } else {
@@ -70,9 +72,9 @@ export class NgxHtml2pdfService {
             pdf.save(name + '.pdf')
             tempDiv.remove();
             resolve();
-          }).catch((res) => {
-            console.log(res);
-            reject();
+          }).catch((error) => {
+            console.error(error);
+            reject(error);
           });
 
         }
@@ -81,45 +83,85 @@ export class NgxHtml2pdfService {
   }
 
   private bigPdfDown(ele: any, name: string, tempDiv: HTMLDivElement) {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>(async (resolve, reject) => {
       console.log(ele.clientWidth, ele.clientHeight);
       this.allHeight = ele.clientHeight;
 
-      let nodeList = [];
+      let nodeList: any[] = [];
       let node = ele.firstChild;
 
       while (node) {
         nodeList.push(node);
         node = node.nextSibling;
       }
-      nodeList = nodeList.filter((node: ChildNode) => node.nodeName !== '#comment')
+      nodeList = nodeList.filter((node: ChildNode) => node.nodeName !== '#comment');
 
-      const promiseList: any[] = [];
-      nodeList.forEach(node => {
-        promiseList.push(html2canvas(node as any, {
-          allowTaint: true, useCORS: true
-        }));
-      })
-
-      Promise.all(promiseList).then(
-        result => {
-          const pdf = new jsPDF('p', 'mm', 'a4') //纵向，单位mm，A4纸张大小
-          let i = 1;
-          for (const canvas of result) {
-            this.draw(canvas, pdf, i === result.length);
-            i++;
-          }
-          pdf.save(name + '.pdf');
-          tempDiv.remove();
-          this.alreadyDrawAllHeight = 0;
-          resolve();
-        },
-        error => {
-          console.log('error', error);
-          this.alreadyDrawAllHeight = 0;
-          reject();
+      const elList = nodeList.reduce((previous: { height: number, elList: any[][] }, current: any) => {
+        if (previous.height + current.clientHeight <= this.singleMaxHeight) {
+          previous.elList[previous.elList.length - 1].push(current);
+          previous.height += current.clientHeight;
+        } else {
+          previous.height = 0;
+          previous.elList.push([]);
+          previous.elList[previous.elList.length - 1].push(current);
+          previous.height += current.clientHeight;
         }
-      )
+        return previous;
+      }, { height: 0, elList: [[]] }).elList;
+
+      nodeList = [];
+
+      const html2pdfBox: any = document.createElement('div');
+      html2pdfBox.setAttribute('id', 'html2pdfBox');
+      document.body.appendChild(html2pdfBox);
+
+      let i = 0;
+      const tempArr: any[] = [];
+      for (let arr of elList) {
+        const block: any = document.createElement('div');
+        html2pdfBox.appendChild(block);
+        tempArr.push(block);
+
+        arr.forEach(item => {
+          block.appendChild(item.cloneNode(true));
+        });
+        nodeList.push(html2pdfBox.lastChild);
+
+        i++;
+        if (elList.length === i) {
+          const promiseList: any[] = [];
+          nodeList.forEach(node => {
+            promiseList.push(html2canvas(node, {
+              allowTaint: true, useCORS: true
+            }));
+          });
+          Promise.all(promiseList).then(result => {
+            const pdf = new jsPDF('p', 'mm', 'a4'); //纵向，单位mm，A4纸张大小
+            let i = 1;
+            for (const canvas of result) {
+              this.draw(canvas, pdf, i === result.length);
+              i++;
+            }
+            pdf.save(name + '.pdf');
+            tempDiv.remove();
+            tempArr.forEach(item => {
+              item.remove();
+            })
+            html2pdfBox.remove();
+            this.alreadyDrawAllHeight = 0;
+            resolve();
+          }, error => {
+            console.log('error', error);
+            tempDiv.remove();
+            tempArr.forEach(item => {
+              item.remove();
+            })
+            html2pdfBox.remove();
+            this.alreadyDrawAllHeight = 0;
+            reject();
+          });
+        }
+      }
     })
   }
 
