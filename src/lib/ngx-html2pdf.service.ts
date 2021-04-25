@@ -111,9 +111,12 @@ export class NgxHtml2pdfService {
 
       nodeList = [];
 
-      const html2pdfBox: any = document.createElement('div');
-      html2pdfBox.setAttribute('id', 'html2pdfBox');
-      document.body.appendChild(html2pdfBox);
+      const indexTemp = document.getElementById('html2canvas');
+      if (!indexTemp || !indexTemp.firstChild) {
+        return;
+      }
+      indexTemp.firstChild.childNodes.forEach(node => node.remove());
+      const html2pdfBox = indexTemp.firstChild;
 
       let i = 0;
       const tempArr: any[] = [];

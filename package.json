@@ -1,6 +1,6 @@
 {
   "name": "ngx-html2pdf",
-  "version": "0.0.6",
+  "version": "0.1.1",
   "author": "lfli",
   "license": "MIT",
   "peerDependencies": {
