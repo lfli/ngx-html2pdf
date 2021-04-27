@@ -14,4 +14,6 @@
 
 ### 3. 调用 html2pdf 方法（promise）
 
-> this.ngxHtml2pdfService.html2pdf(elementId: string, pdfName: string).then().catch()
+> this.ngxHtml2pdfService.html2pdf(elementId: string, pdfName: string, size?: Size).then().catch()
+
+> type Size = 'a0' | 'a1' | 'a2' | 'a3' | 'a4' | 'a5'

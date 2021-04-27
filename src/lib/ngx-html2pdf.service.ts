@@ -8,14 +8,43 @@ interface IncompletePage {
   top: number
 }
 
+type Size = 'a0' | 'a1' | 'a2' | 'a3' | 'a4' | 'a5'
+
 @Injectable({
   providedIn: 'root'
 })
 export class NgxHtml2pdfService {
 
+  private paperMap: { [key: string]: { width: number, height: number } } = {
+    a0: {
+      width: 841,
+      height: 1189
+    },
+    a1: {
+      width: 594,
+      height: 841
+    },
+    a2: {
+      width: 420,
+      height: 594
+    },
+    a3: {
+      width: 297,
+      height: 420
+    },
+    a4: {
+      width: 210,
+      height: 297
+    },
+    a5: {
+      width: 148,
+      height: 210
+    },
+  }
+
   private singleMaxHeight = 15000;
 
-  html2pdf(id: string, name: string) {
+  html2pdf(id: string, name: string, size: Size = 'a4') {
     return new Promise<void>((resolve, reject) => {
       const tempDiv = document.createElement('div');
       tempDiv.setAttribute('id', 'html2canvas');
@@ -38,7 +67,7 @@ export class NgxHtml2pdfService {
 
         if (ele.clientHeight > this.singleMaxHeight) {
 
-          this.bigPdfDown(ele, name, tempDiv).then(_ => {
+          this.bigPdfDown(ele, name, tempDiv, size).then(_ => {
             resolve();
           }).catch(error => {
             reject(error);
@@ -48,11 +77,11 @@ export class NgxHtml2pdfService {
 
           const option = { allowTaint: true, useCORS: true };
           html2canvas(ele, option).then((canvas) => {
-            let pdf: any = new jsPDF('p', 'mm', 'a4') //纵向，单位mm，A4纸张大小
+            let pdf: any = new jsPDF('p', 'mm', size) //纵向，单位mm
             let ctx: any = canvas.getContext('2d'); //预设2维画布
-            let a4w: number = 190;  //设置显示内容的大小，A4大小：210*297；最后显示在A4内部区域大小为：190*260
-            let a4h: number = 260;
-            let imgHeight: number = Math.floor(a4h * canvas.width / a4w); //按A4显示比例换算一页图像的像素高度
+            const aw: number = this.paperMap[size].width - 20;  //设置显示内容的大小
+            const ah: number = this.paperMap[size].height - 20;
+            let imgHeight: number = Math.floor(ah * canvas.width / aw); //按显示比例换算一页图像的像素高度
             let renderedHeight: number = 0;
 
             while (renderedHeight < canvas.height) {//判断页面有内容时
@@ -62,7 +91,7 @@ export class NgxHtml2pdfService {
               //用getImageData裁剪指定区域，并绘制到前面创建的canvas对象中
               let a: any = page.getContext('2d');
               a.putImageData(ctx.getImageData(0, renderedHeight, canvas.width, Math.min(imgHeight, canvas.height - renderedHeight)), 0, 0);
-              pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, a4w, Math.min(a4h, a4w * page.height / page.width)); //添加图片到页面，保留10mm边距
+              pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, aw, Math.min(ah, aw * page.height / page.width)); //添加图片到页面，保留10mm边距
 
               renderedHeight += imgHeight;
               if (renderedHeight < canvas.height) {
@@ -82,7 +111,7 @@ export class NgxHtml2pdfService {
     })
   }
 
-  private bigPdfDown(ele: any, name: string, tempDiv: HTMLDivElement) {
+  private bigPdfDown(ele: any, name: string, tempDiv: HTMLDivElement, size: Size) {
     return new Promise<void>(async (resolve, reject) => {
       console.log(ele.clientWidth, ele.clientHeight);
       this.allHeight = ele.clientHeight;
@@ -139,10 +168,10 @@ export class NgxHtml2pdfService {
             }));
           });
           Promise.all(promiseList).then(result => {
-            const pdf = new jsPDF('p', 'mm', 'a4'); //纵向，单位mm，A4纸张大小
+            const pdf = new jsPDF('p', 'mm', size); //纵向，单位mm
             let i = 1;
             for (const canvas of result) {
-              this.draw(canvas, pdf, i === result.length);
+              this.draw(canvas, pdf, i === result.length, size);
               i++;
             }
             pdf.save(name + '.pdf');
@@ -170,14 +199,16 @@ export class NgxHtml2pdfService {
 
   private allHeight = 0;
   private alreadyDrawAllHeight = 0;
-  private a4w = 190;
-  private a4h = 260;
+
   // 存放未达成一页的 page
   private IncompletePage: IncompletePage | null = null;
-  private draw(canvas: any, pdf: any, isLastCanvas: boolean) {
+  private draw(canvas: any, pdf: any, isLastCanvas: boolean, size: Size) {
+
+    const aw: number = this.paperMap[size].width - 20;  //设置显示内容的大小
+    const ah: number = this.paperMap[size].height - 20;
 
     // pdf 一页显示的 canvas 高度
-    let canvasOfPdfOnePageHeight: number = Math.floor(this.a4h * canvas.width / this.a4w);
+    let canvasOfPdfOnePageHeight: number = Math.floor(ah * canvas.width / aw);
     // 当前 canvas 已绘制高度
     let renderedHeight = 0;
 
@@ -223,7 +254,7 @@ export class NgxHtml2pdfService {
 
       // 如果当前 canvas 未绘制完
       if (renderedHeight < canvas.height) {
-        pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, this.a4w, Math.min(this.a4h, this.a4w * page.height / page.width));
+        pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, aw, Math.min(ah, aw * page.height / page.width));
         pdf.addPage();
 
         page = document.createElement('canvas');
@@ -250,11 +281,11 @@ export class NgxHtml2pdfService {
               top: top
             }
           } else {
-            pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, this.a4w, Math.min(this.a4h, this.a4w * page.height / page.width));
+            pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, aw, Math.min(ah, aw * page.height / page.width));
             pdf.addPage();
           }
         } else {
-          pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, this.a4w, Math.min(this.a4h, this.a4w * page.height / page.width));
+          pdf.addImage(page.toDataURL('image/jpeg', 1.0), 'JPEG', 10, 10, aw, Math.min(ah, aw * page.height / page.width));
         }
       }
     } while (renderedHeight < canvas.height);
